@@ -9,7 +9,7 @@ module.exports = router;
 
 // a reusable function
 function respondWithAllTweets (req, res, next){
-  var allTheTweets = tweetBank.list();
+  // var allTheTweets = tweetBank.list();
   client.query('SELECT * FROM tweets', function (err, result) {
   if (err) return next(err); // pass errors to Express
   var tweets = result.rows;
@@ -45,18 +45,78 @@ router.get('/users/:username', function(req, res, next){
   });
 });
 
+
+
 // single-tweet page
 router.get('/tweets/:id', function(req, res, next){
   // var tweetsWithThatId = tweetBank.find({ id: Number(req.params.id) });
-  res.render('index', {
-    title: 'Twitter.js',
-    tweets: tweetsWithThatId // an array of only one element ;-)
-  });
+  client.query('SELECT content FROM tweets WHERE id=$1',[req.params.id], function(err,result) {
+    if (err) return next(err);
+    var tweets = result.rows;
+    console.log(tweets);
+    res.render('index', { title: 'Twitter.js', tweets, showForm: true });
+  })
+  // res.render('index', {
+  //   title: 'Twitter.js',
+  //   tweets: tweetsWithThatId // an array of only one element ;-)
+  // });
 });
+
+// var checkName = client.query("SELECT id FROM users WHERE name='Howard'", function (err, result) {
+//   if (err) return next(err);
+//   console.log(result);
+// })
+
+//INSERT FUNCTION
+/*
+client.query('INSERT INTO tweets (user_id, content) VALUES ($1,$2)', [param1,req.body.name], function(err,result) {
+
+}
+*/
+
 
 // create a new tweet
 router.post('/tweets', function(req, res, next){
-  var newTweet = tweetBank.add(req.body.name, req.body.content);
+  // var newTweet = tweetBank.add(req.body.name, req.body.content);
+  //INSERT error checking to make sure req.body.name + req.body.content both are filled out
+  client.query("SELECT id FROM users WHERE name=$1",[req.body.name], function (err, result) {
+    if (err) return next(err);
+    var checkName = result.rows;
+    if(checkName.length === 0) {
+      //INSERT function for USERS then Query and INSERT into tweets
+      client.query('INSERT INTO users (name, picture_url) VALUE ($1,$2)', [req.body.name, null],function(err,result){
+        if(err) return next(err);
+        //START here
+        client.query("SELECT id FROM users WHERE name=$1",[req.body.name], function (err, result) {
+          if (err) return next(err);
+          var checkName = result.rows;
+          if(!checkName) {
+            //INSERT function for USERS then Query and INSERT into tweets
+            client.query('INSERT INTO users (name, picture_url) VALUE ($1,$2)', [req.body.name, null],function(err,result){
+              if(err) return next(err);
+
+            });
+          } else {
+            //INSERT function into tweets
+            client.query('INSERT INTO tweets (user_id, content) VALUE ($1,$2)', [checkName,req.body.content],function(err,result){
+              if(err) return next(err);
+              var tweets = result.rows;
+              res.render('index', { title: 'Twitter.js', tweets, showForm: true });
+            });
+          }
+        }); //DELETE HERE
+
+
+      });
+    } else {
+      //INSERT function into tweets
+      client.query('INSERT INTO tweets (user_id, content) VALUE ($1,$2)', [checkName,req.body.content],function(err,result){
+        if(err) return next(err);
+        var tweets = result.rows;
+        res.render('index', { title: 'Twitter.js', tweets, showForm: true });
+      });
+    }
+  });
   res.redirect('/');
 });
 
